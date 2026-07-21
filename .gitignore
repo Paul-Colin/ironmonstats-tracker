@@ -1,0 +1,25 @@
+Settings.ini
+NetworkSettings.ini
+Requests.json
+*.trackerdata
+*.nds
+*.log
+*.txt
+*.pastlog
+*.statistics
+*.colortheme
+*.qlp
+!death_quotes.txt
+!StreamerbotCodeImport.txt
+*.pt
+*.faves
+*.tdata
+*.State
+# Fichiers perso (installation locale)
+TODO.md
+MAP items HGSS.png
+savedData/live_events.json
+# LiveConnect : config locale (contient le token) + fichiers d'echange curl/scan
+savedData/LiveConnect.ini
+savedData/liveconnect_*
+.claude/
