@@ -1,0 +1,188 @@
+<!doctype html>
+<!--
+  Widgets du layout BizHawk (prototype). Page affichee dans un WebView2 transparent
+  incruste dans la fenetre de l'emulateur par addons/LayoutPrototype.lua, qui pousse
+  l'etat du tracker via IMS.update({...}) a chaque changement.
+  Les couleurs et la typographie reprennent celles d'IronMonStats (Baloo 2 / Nunito).
+-->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root {
+	--app-primary: #ee3a3a;
+	--d-card: #ffffff;
+	--d-border: #eef1f6;
+	--d-soft: #f5f6fa;
+	--d-strong: #20242e;
+	--d-body: #3a4150;
+	--d-sub: #6b7280;
+	--d-faint: #9aa1ad;
+	--d-ok: #34c759;
+	--d-ko: #ef5350;
+	--d-warn: #d98a16;
+	--shadow: 0 10px 28px rgba(15, 22, 45, .38);
+}
+html.dark {
+	--d-card: #1a212b;
+	--d-border: #29323f;
+	--d-soft: #222b36;
+	--d-strong: #f2f4f8;
+	--d-body: #c7cedb;
+	--d-sub: #97a1b2;
+	--d-faint: #6b7585;
+}
+/* Theme « Verre » : surfaces sombres translucides, comme la carte dresseur. */
+html.glass {
+	--d-card: rgba(12, 16, 30, 0.62);
+	--d-soft: rgba(255, 255, 255, 0.09);
+	--d-border: rgba(255, 255, 255, 0.18);
+}
+* { box-sizing: border-box; }
+html, body {
+	margin: 0;
+	background: transparent;
+	font-family: 'Nunito', 'Segoe UI', sans-serif;
+	color: var(--d-body);
+	overflow: hidden;
+	user-select: none;
+}
+#stack { display: flex; flex-direction: column; gap: 14px; padding: 16px; }
+.card {
+	background: var(--d-card);
+	border: 1px solid var(--d-border);
+	border-radius: 18px;
+	box-shadow: var(--shadow);
+	padding: 14px 16px 16px;
+}
+.label {
+	display: flex; align-items: center; gap: 7px;
+	font-size: 11px; font-weight: 800; letter-spacing: .09em;
+	text-transform: uppercase; color: var(--d-faint);
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--app-primary); flex: none; }
+.display { font-family: 'Baloo 2', 'Nunito', 'Segoe UI', sans-serif; font-weight: 800; color: var(--d-strong); line-height: 1.05; }
+
+/* Carte Pokémon en tête */
+.lead-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.sprite-box {
+	width: 72px; height: 72px; flex: none; border-radius: 16px;
+	background: var(--d-soft); display: flex; align-items: center; justify-content: center;
+}
+.sprite { width: 64px; height: 64px; object-fit: contain; image-rendering: pixelated; }
+.name { font-size: 25px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meta { display: flex; align-items: center; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+.pill {
+	font-size: 12px; font-weight: 800; padding: 2px 9px; border-radius: 999px;
+	color: var(--app-primary); background: color-mix(in srgb, var(--app-primary) 13%, transparent);
+}
+.type { height: 16px; image-rendering: pixelated; border-radius: 3px; }
+.hp { margin-top: 12px; }
+.hp-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; font-weight: 800; color: var(--d-sub); }
+.hp-head b { font-size: 15px; color: var(--d-strong); }
+.bar { height: 10px; border-radius: 6px; background: var(--d-soft); overflow: hidden; margin-top: 5px; }
+.bar i { display: block; height: 100%; width: 0; border-radius: 6px; background: var(--d-ok); transition: width .35s ease, background-color .35s ease; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 12px; }
+.stat { background: var(--d-soft); border-radius: 12px; padding: 6px 9px 5px; }
+.stat span { display: block; font-size: 10px; font-weight: 800; letter-spacing: .08em; color: var(--d-faint); }
+.stat b { font-size: 19px; }
+.empty { margin-top: 8px; font-size: 14px; font-weight: 700; color: var(--d-sub); }
+
+/* Carte tentative */
+.run-row { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 4px; }
+.attempt { font-size: 34px; }
+.status { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; color: var(--d-sub); padding-bottom: 6px; }
+.status i { width: 8px; height: 8px; border-radius: 50%; background: var(--d-faint); }
+.status.ok i { background: var(--d-ok); }
+.status.ko i { background: var(--d-ko); }
+.status.warn i { background: var(--d-warn); }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div id="stack">
+	<section class="card">
+		<div class="label"><i class="dot"></i>Pokémon en tête</div>
+		<div id="lead" class="hidden">
+			<div class="lead-row">
+				<div class="sprite-box"><img id="sprite" class="sprite" alt=""></div>
+				<div style="min-width:0">
+					<div id="name" class="name display"></div>
+					<div class="meta"><span id="level" class="pill"></span><span id="types" style="display:flex;gap:4px"></span></div>
+				</div>
+			</div>
+			<div class="hp">
+				<div class="hp-head"><span>PV</span><b id="hp-text"></b></div>
+				<div class="bar"><i id="hp-bar"></i></div>
+			</div>
+			<div class="stats">
+				<div class="stat"><span>ATQ</span><b id="s-atk" class="display"></b></div>
+				<div class="stat"><span>DEF</span><b id="s-def" class="display"></b></div>
+				<div class="stat"><span>VIT</span><b id="s-spe" class="display"></b></div>
+				<div class="stat"><span>A.SP</span><b id="s-spa" class="display"></b></div>
+				<div class="stat"><span>D.SP</span><b id="s-spd" class="display"></b></div>
+				<div class="stat"><span>BST</span><b id="s-bst" class="display"></b></div>
+			</div>
+		</div>
+		<div id="no-lead" class="empty">Aucun Pokémon pour l'instant</div>
+	</section>
+
+	<section class="card">
+		<div class="label"><i class="dot"></i>Tentative</div>
+		<div class="run-row">
+			<div id="attempt" class="attempt display">–</div>
+			<div id="status" class="status"><i></i><span id="status-text">IronMonStats</span></div>
+		</div>
+	</section>
+</div>
+
+<script>
+(function () {
+	var $ = function (id) { return document.getElementById(id); };
+	function text(id, value) { $(id).textContent = (value === null || value === undefined) ? '–' : value; }
+
+	window.IMS = {
+		update: function (state) {
+			state = state || {};
+			document.documentElement.classList.toggle('dark', state.theme === 'dark' || state.theme === 'glass');
+			document.documentElement.classList.toggle('glass', state.theme === 'glass');
+			if (state.accent) { document.documentElement.style.setProperty('--app-primary', '#' + state.accent); }
+
+			var lead = state.lead;
+			$('lead').classList.toggle('hidden', !lead);
+			$('no-lead').classList.toggle('hidden', !!lead);
+			if (lead) {
+				text('name', lead.name);
+				text('level', 'Niv. ' + lead.level);
+				if ($('sprite').getAttribute('src') !== lead.sprite) { $('sprite').setAttribute('src', lead.sprite || ''); }
+				var types = (lead.types || []).join('|');
+				if ($('types').dataset.key !== types) {
+					$('types').dataset.key = types;
+					$('types').innerHTML = '';
+					(lead.types || []).forEach(function (url) {
+						var img = document.createElement('img');
+						img.className = 'type';
+						img.src = url;
+						$('types').appendChild(img);
+					});
+				}
+				var ratio = lead.maxHp > 0 ? Math.max(0, Math.min(1, lead.hp / lead.maxHp)) : 0;
+				text('hp-text', lead.hp + ' / ' + lead.maxHp);
+				$('hp-bar').style.width = (ratio * 100) + '%';
+				$('hp-bar').style.backgroundColor = ratio > 0.5 ? 'var(--d-ok)' : (ratio > 0.2 ? 'var(--d-warn)' : 'var(--d-ko)');
+				text('s-atk', lead.atk); text('s-def', lead.def); text('s-spe', lead.spe);
+				text('s-spa', lead.spa); text('s-spd', lead.spd); text('s-bst', lead.bst);
+			}
+
+			text('attempt', state.attempts ? 'N° ' + state.attempts : '–');
+			var status = state.status || {};
+			$('status').className = 'status ' + (status.kind || '');
+			text('status-text', status.text || 'IronMonStats');
+		}
+	};
+})();
+</script>
+</body>
+</html>

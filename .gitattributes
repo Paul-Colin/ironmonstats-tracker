@@ -1,0 +1,5 @@
+* text=auto
+
+# Outils de maintenance du depot : jamais inclus dans le miroir public
+# (git archive, cf. scripts/publish-public-mirror.sh).
+scripts/ export-ignore
